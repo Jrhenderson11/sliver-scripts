@@ -1,3 +1,4 @@
+halo
 sliver-py
 argparse
 asyncio
